@@ -155,6 +155,10 @@ func resourceOpennebulaVirtualMachine() *schema.Resource {
 			},
 			"lock": lockSchema(),
 		},
+		Timeouts: &schema.ResourceTimeout{
+			Create: schema.DefaultTimeout(60 * time.Minute),
+			Delete: schema.DefaultTimeout(60 * time.Minute),
+		},
 	}
 }
 
@@ -401,7 +405,7 @@ func resourceOpennebulaVirtualMachineCreate(d *schema.ResourceData, meta interfa
 		expectedState = "HOLD"
 	}
 
-	timeout := d.Get("timeout").(int)
+	timeout := int(d.Timeout(schema.TimeoutCreate).Minutes())
 	_, err = waitForVMState(vmc, timeout, expectedState)
 	if err != nil {
 		return fmt.Errorf(
@@ -592,6 +596,13 @@ func matchDisk(diskConfig map[string]interface{}, disk shared.Disk) bool {
 	size, _ := disk.GetI(shared.Size)
 	driver, _ := disk.Get(shared.Driver)
 	target, _ := disk.Get(shared.TargetDisk)
+
+	//
+	if diskConfig["computed_target"] == nil || diskConfig["target"] == nil ||
+		diskConfig["computed_driver"] == nil || diskConfig["driver"] == nil ||
+		diskConfig["computed_size"] == nil || diskConfig["size"] == nil {
+		return false
+	}
 
 	return (len(diskConfig["target"].(string)) == 0 || target != diskConfig["computed_target"].(string)) ||
 		(diskConfig["size"].(int) == 0 || size != diskConfig["computed_size"].(int)) ||
@@ -1219,7 +1230,7 @@ func resourceOpennebulaVirtualMachineUpdate(d *schema.ResourceData, meta interfa
 
 	if updateConf == true {
 
-		timeout := d.Get("timeout").(int)
+		timeout := int(d.Timeout(schema.TimeoutCreate).Minutes())
 
 		_, err = waitForVMState(vmc, timeout, "RUNNING")
 		if err != nil {
@@ -1272,7 +1283,7 @@ func resourceOpennebulaVirtualMachineDelete(d *schema.ResourceData, meta interfa
 	}
 
 	// wait state to be ready
-	timeout := d.Get("timeout").(int)
+	timeout := int(d.Timeout(schema.TimeoutDelete).Minutes())
 
 	_, err = waitForVMState(vmc, timeout, "RUNNING")
 	if err != nil {
